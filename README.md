@@ -44,7 +44,7 @@ Hermes operates SQLite with `PRAGMA journal_mode = WAL;`. `hermes-share` reads f
 - Application-level separation: `hermes-share` never writes to `state.db`. All share tokens, view counts, and expiration metadata are stored in an isolated database (`share.db`).
 
 > [!IMPORTANT]
-> In WAL mode, SQLite readers require write permission to `-shm` for coordination locks. When containerizing, ensure `securityContext` (UID/GID) matches the host file owner rather than making the filesystem mount read-only.
+> In WAL mode, SQLite readers require write permission to the `-shm` file for coordination locks. Ensure the process has read and write permissions in the directory containing `state.db`.
 
 ---
 
@@ -118,8 +118,8 @@ hermes-share create --latest --no-live
 # Lookup session bound to a specific Telegram topic (chat_id:thread_id)
 hermes-share create --telegram-topic "87679709:490031"
 
-# Target a remote or containerized hermes-share instance
-hermes-share create --server http://192.168.254.7:30180 --api-key "your-secret-key" --latest
+# Target a remote hermes-share server
+hermes-share create --server http://127.0.0.1:8000 --api-key "your-secret-key" --latest
 
 # List all active share links
 hermes-share list
@@ -127,66 +127,6 @@ hermes-share list
 # Revoke a link immediately
 hermes-share revoke sh_877L4pBy1tEmqFVJFbCpJaVTLSxkpLom
 ```
-
----
-
-## Deployment
-
-### Container (Docker / Podman)
-
-Build the multi-stage container:
-
-```bash
-podman build -t hermes-share:latest .
-```
-
-Run container with host volume mounts:
-
-```bash
-podman run -d \
-  --name hermes-share \
-  -p 8000:8000 \
-  -v ~/.hermes:/data/hermes:rw \
-  -v hermes-share-data:/data/share:rw \
-  -e BASE_URL="http://192.168.254.7:8000" \
-  -e MANAGEMENT_API_KEY="your-secure-management-key" \
-  hermes-share:latest
-```
-
-### Kubernetes (Helm)
-
-The declarative Helm chart is located in `charts/hermes-share/`.
-
-1. Inspect or modify `charts/hermes-share/values.yaml`:
-   ```yaml
-   image:
-     repository: localhost/hermes-share
-     tag: latest
-     pullPolicy: IfNotPresent
-
-   hermes:
-     hostDbPath: "/home/masix/.hermes"
-     mountPath: "/data/hermes"
-
-   storage:
-     enabled: true
-     size: 1Gi
-
-   auth:
-     managementApiKey: "your-management-api-key"
-
-   service:
-     type: NodePort
-     port: 8000
-     nodePort: 30180
-   ```
-
-2. Deploy using Helm:
-   ```bash
-   helm upgrade --install hermes-share ./charts/hermes-share \
-     -n hermes-share \
-     --create-namespace
-   ```
 
 ---
 
