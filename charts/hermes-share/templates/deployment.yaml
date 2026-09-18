@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hermes-share.fullname" . }}
+  labels:
+    {{- include "hermes-share.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "hermes-share.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hermes-share.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ .Values | toJson | sha256sum }}
+    spec:
+      securityContext:
+        runAsUser: {{ .Values.securityContext.runAsUser }}
+        runAsGroup: {{ .Values.securityContext.runAsGroup }}
+        fsGroup: {{ .Values.securityContext.fsGroup }}
+      containers:
+        - name: hermes-share
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: HERMES_DB_PATH
+              value: "{{ .Values.hermes.mountPath }}/{{ .Values.hermes.dbFileName }}"
+            - name: SHARE_DB_PATH
+              value: "{{ .Values.storage.mountPath }}/share.db"
+            - name: MANAGEMENT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hermes-share.secretName" . }}
+                  key: {{ .Values.auth.apiKeyKey }}
+            - name: DEFAULT_TTL_SECONDS
+              value: "{{ .Values.auth.defaultTtlSeconds }}"
+            - name: BASE_URL
+              value: "{{ .Values.env.BASE_URL }}"
+            - name: REDACT_SECRETS
+              value: "{{ .Values.env.REDACT_SECRETS }}"
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: hermes-state
+              mountPath: {{ .Values.hermes.mountPath }}
+            - name: share-data
+              mountPath: {{ .Values.storage.mountPath }}
+      volumes:
+        - name: hermes-state
+          hostPath:
+            path: {{ .Values.hermes.hostDbPath }}
+            type: Directory
+        - name: share-data
+          {{- if .Values.storage.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "hermes-share.fullname" . }}-pvc
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

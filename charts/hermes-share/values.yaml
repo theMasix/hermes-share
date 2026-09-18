@@ -1,0 +1,70 @@
+# Default values for hermes-share.
+# Declarative Helm Values for ~/cloud-configs/hermes-share/values.yaml
+
+image:
+  repository: ghcr.io/yourorg/hermes-share
+  pullPolicy: IfNotPresent
+  tag: "v1.0.0"
+
+replicaCount: 1
+
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+hermes:
+  # Host directory containing state.db, state.db-wal, and state.db-shm
+  hostDbPath: "/home/masix/.hermes"
+  mountPath: "/data/hermes"
+  dbFileName: "state.db"
+
+storage:
+  # Persistent volume for share.db metadata
+  enabled: true
+  size: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  mountPath: "/data/share"
+
+auth:
+  # If existingSecret is provided, it must contain apiKeyKey
+  existingSecret: ""
+  apiKeyKey: "management-api-key"
+  # Inlined management key if existingSecret is empty
+  managementApiKey: "change-me-to-a-secure-secret-key"
+  # Default share link TTL in seconds (0 = never expires)
+  defaultTtlSeconds: 0
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations:
+    # Disable buffering for real-time SSE event streaming
+    traefik.ingress.kubernetes.io/buffering: "false"
+  hosts:
+    - host: share.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+env:
+  BASE_URL: "http://localhost:8000"
+  REDACT_SECRETS: "true"
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

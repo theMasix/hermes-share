@@ -1,0 +1,14 @@
+apiVersion: v2
+name: hermes-share
+description: Production companion service for live-sharing Hermes Agent conversation sessions
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - hermes
+  - ai
+  - chat-share
+  - sse
+  - kubernetes
+maintainers:
+  - name: Nous Research
