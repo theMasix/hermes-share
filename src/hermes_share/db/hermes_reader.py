@@ -58,15 +58,20 @@ class HermesReader:
             return session
 
     def get_latest_session(self) -> dict[str, Any] | None:
-        """Fetch the most recent session."""
+        """Fetch the most recently active session."""
         with self._get_connection() as conn:
             cur = conn.cursor()
             cur.execute(
                 """
-                SELECT id, source, title, model, started_at, ended_at,
-                       message_count, tool_call_count, chat_id, thread_id
-                FROM sessions
-                ORDER BY started_at DESC
+                SELECT s.id, s.source, s.title, s.model, s.started_at, s.ended_at,
+                       s.message_count, s.tool_call_count, s.chat_id, s.thread_id
+                FROM sessions s
+                LEFT JOIN (
+                    SELECT session_id, MAX(timestamp) AS last_activity
+                    FROM messages
+                    GROUP BY session_id
+                ) m ON s.id = m.session_id
+                ORDER BY COALESCE(m.last_activity, s.started_at) DESC
                 LIMIT 1;
                 """
             )
